@@ -1,10 +1,10 @@
 # clark-scholars-ppi-predict
 research project for the **Clark Scholars Program** (currently private)\
 building LLM-augmented ML model for PPI predictions incorporating both structure and sequence data from protein sequences\
+**EXACT PROJECT DETAILS STILL IN PROGRESS**
 learning machine learning by doing (have not coded a single line of ML prior to this project) \
 \
-*Relevant Information:* \
-
+*Relevant Information:* 
 Old dataset (may not use)
 
 Dataset is curated from Richoux et. al. (2019), https://arxiv.org/pdf/1901.06268, which features a curated PPI prediction database specifically aimed to prevent Information Leak, used for SOTA benchmarks in models like SPNet \
