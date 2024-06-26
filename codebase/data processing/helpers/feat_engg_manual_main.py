@@ -19,43 +19,44 @@ from helpers.SkipGram import SkipGram
 from helpers.LabelEncoding import LabelEncoding
 from helpers.PSSM import PSSM
 from helpers.Blosum62 import Blosum62
+import numpy as np
 
 import time
 
 def extract_prot_seq_1D_manual_feat(root_path='./', prot_seq = 'MIFTPFLPPADLSVFQNVKGLQNDPE', feature_type_lst = ['AC30', 'PSAAC15', 'ConjointTriad', 'LD10_CTD'], deviceType='cpu'):
-    print('#### inside the extract_prot_seq_1D_manual_feat() method - Start')
+    print('[Extracting 1D Manual Features -- START]')
     fastas = [('999', prot_seq)]
     featureSets = set(feature_type_lst)
     # the dictionary to be returned
     seq_manual_feat_dict = {}
 
     if 'AC30' in featureSets:
-        print("Calculating 'AC30' feature - Start")
+        #print("Calculating 'AC30' feature - Start") for debugging
         ac = AutoCovariance(fastas, lag=30, deviceType=deviceType)    
         seq_manual_feat_dict['AC30'] = ac[1][1:]
-        print("Calculating 'AC30' feature - End")
+        #print("Calculating 'AC30' feature - End") for debugging
 
     if 'PSAAC15' in featureSets or 'PSEAAC15' in featureSets:
-        print("Calculating 'PSAAC15' feature - Start")
+        #print("Calculating 'PSAAC15' feature - Start") for debugging
         paac = PSEAAC(fastas,lag=15)
         seq_manual_feat_dict['PSAAC15'] = paac[1][1:]
-        print("Calculating 'PSAAC15' feature - End")
+        #print("Calculating 'PSAAC15' feature - End") for debugging
 
     if 'ConjointTriad' in featureSets or 'CT' in featureSets:
-        print("Calculating 'ConjointTriad' feature - Start")
+        #print("Calculating 'ConjointTriad' feature - Start") for debugging
         ct = ConjointTriad(fastas,deviceType=deviceType)
         seq_manual_feat_dict['ConjointTriad'] = ct[1][1:]
-        print("Calculating 'ConjointTriad' feature - End")
+        #print("Calculating 'ConjointTriad' feature - End") for debugging
 
     if 'LD10_CTD' in featureSets:
-        print("Calculating 'LD10_CTD' feature - Start")
+        #print("Calculating 'LD10_CTD' feature - Start") for debugging
         (comp, tran, dist) = LDCTD(fastas)
         seq_manual_feat_dict['LD10_CTD_ConjointTriad_C'] = comp[1][1:]
         seq_manual_feat_dict['LD10_CTD_ConjointTriad_T'] = tran[1][1:]
         seq_manual_feat_dict['LD10_CTD_ConjointTriad_D'] = dist[1][1:]
-        print("Calculating 'LD10_CTD' feature - End")
+        #print("Calculating 'LD10_CTD' feature - End") for debugging
 
-    print('#### inside the extract_prot_seq_1D_manual_feat() method - End')
+    print('[Extracting 1D Manual Features -- END]')
     return seq_manual_feat_dict
 
 
@@ -89,11 +90,9 @@ if __name__ == '__main__':
     root_path = os.path.join('/project/root/directory/path/here')
     
 
-    prot_seq = 'MIFTPFLPPADLSVFQNVKGLQNDPE'
+    prot_seq = 'SSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENL'
     feature_type_lst = ['AC30', 'PSAAC15', 'ConjointTriad', 'LD10_CTD']
     seq_manual_feat_dict = extract_prot_seq_1D_manual_feat(root_path, prot_seq = prot_seq, feature_type_lst = feature_type_lst, deviceType='cpu')
-    print("AC: " + str(seq_manual_feat_dict['AC30']))
-    print("PSAAC: " + str(seq_manual_feat_dict['PSAAC15']))
-    print("ConjointTriad: " + str(seq_manual_feat_dict['ConjointTriad']))
-    print("LD10_CTD: " + str(seq_manual_feat_dict['LD10_CTD']))
+    mf_vector = np.concatenate((seq_manual_feat_dict['AC30'], seq_manual_feat_dict['PSAAC15'], seq_manual_feat_dict['ConjointTriad'], seq_manual_feat_dict['LD10_CTD_ConjointTriad_C'], seq_manual_feat_dict['LD10_CTD_ConjointTriad_T'], seq_manual_feat_dict['LD10_CTD_ConjointTriad_D']))
+    print(len(mf_vector)) #works :)
 
