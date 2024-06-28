@@ -24,4 +24,9 @@ from helpers.Covariance import Covariance
 
 
 def AutoCovariance(fastas, aaIDs = ['GUO_H1','HOPT810101','KRIW790103','GRAR740102','CHAM820101','ROSG850103_GUO_SASA','GUO_NCI'], lag=30, deviceType='cpu'):
-    return Covariance(fastas,aaIDs,lag,separate=False,calcType='AutoCovariance',deviceType=deviceType)
+    return Covariance(fastas,aaIDs,lag,separate=False,calcType='AutoCovariance',deviceType=deviceType) #replace NaN with zero if sequence length <30
+
+#if __name__ == '__main__':
+    test_seq = "GIVEQCCTSICSLYQLENYCN" #insulin A (<30 length)
+    test_seq = "XXDQZMNKHHH" #insulin B (>30 length)
+    print (AutoCovariance(fastas = [('999', test_seq)])[1][1:])

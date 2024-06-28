@@ -146,11 +146,15 @@ def AACounter(fastas, groupings = None, groupLen=1, sorting=False,flip=False,nor
                 tDataMat[maskingMatrix[i]] = tDataMat[maskingMatrix[i]] * numGroups + stIdx[i:(stIdx.shape[0]-(maskLen-i-1))]
             tData = tDataMat.T #ensure amino acid sequence length is in dimension 0, to match gapping code when no matrix is supplied
         else:
-            tData = torch.zeros(stIdx.shape[0]-(groupLen-1),device=deviceType).long()
-            #calculate indices from stIdx, using same logic as calcI
-            for i in range(0,groupLen):
-                tData = tData * numGroups + stIdx[i:(stIdx.shape[0]-(groupLen-i-1))]
-            
+            try:
+                tData = torch.zeros(stIdx.shape[0]-(groupLen-1),device=deviceType).long()
+                #calculate indices from stIdx, using same logic as calcI
+                for i in range(0,groupLen):
+                    tData = tData * numGroups + stIdx[i:(stIdx.shape[0]-(groupLen-i-1))]
+            except:
+                tData = torch.zeros(1).long()
+                #print("exception!! stidx.shape: " + str(stIdx.shape[0]) + " grouplen: " + str(groupLen))
+                #print("stidx: " + str(stIdx))
         #map from allIdx to actual index (which takes into account sorting/flipping/excluding) using group lookup array
         tData2 = groupLookup[tData.flatten()].reshape(tData.shape)
         
