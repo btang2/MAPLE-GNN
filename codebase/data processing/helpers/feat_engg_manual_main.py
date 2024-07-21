@@ -79,7 +79,7 @@ def extract_prot_seq_1D_manual_feat(root_path='./', prot_seq = 'MIFTPFLPPADLSVFQ
     return seq_manual_feat_dict
 
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     root_path = os.path.join('/project/root/directory/path/here')
     
 
