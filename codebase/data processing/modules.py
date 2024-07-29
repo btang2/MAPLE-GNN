@@ -706,6 +706,7 @@ if __name__ == '__main__':
             with open(filename, "w") as fd:
                 fd.write(pdbfile)
         ID_to_explain_graph(ID.lower(), chainid)
+    
     #seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=str(ID), chainid="A")
     #PDB_to_DSSP(ID, "A", seq_dict)
     #ang_cutoff = 9.0

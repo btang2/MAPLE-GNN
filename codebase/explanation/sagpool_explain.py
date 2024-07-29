@@ -363,38 +363,42 @@ def visualize_1d_IG(model, modelname, p1_ID, p2_ID, p1_node_norm, p2_node_norm, 
     sns.set_style('ticks')
     
     f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, dpi=1200)
-    f.set_figwidth(10)
-    f.set_figheight(3)
+    f.set_figwidth(5)
+    f.set_figheight(1.5)
     
     # ax1.plot(df.x, df.y)
-    ax1.set_title(f'{p1_ID} Residue Attributions',fontsize=10)
-    ax1.set_ylabel("Attribution Score", fontsize=9, weight='bold')
-    ax1.set_xlabel("Residue Index",fontsize=9, weight='bold')
+    ax1.set_title(f'{p1_ID} Residue Attributions',fontsize=5) #10
+    ax1.set_ylabel("Attribution Score", fontsize=4, weight='bold') #9
+    ax1.set_xlabel("Residue Index",fontsize=4, weight='bold') #9
     #ax1.get_xaxis().set_visible(False)
-    ax1.set_xticks(range(0,len(p1_x), 1))
+    ax1.set_xticks(range(0,len(p1_x), 2))
     #start, end = ax1.get_ylim()
     #ax1.yaxis.set_ticks(np.arange(start, end, 1.0))
 
     sns.barplot(x=p1_x, y=p1_node_norm, palette=p1_colors, ax=ax1, hue=p1_x, legend=False)
     for i in p1_gt:
-        ax1.axvspan(i-1.5, i-0.5, color='tab:red', alpha=0.1, linewidth=0)
-    ax1.tick_params(axis='x', labelsize=7)
-    ax1.tick_params(axis='y', labelsize=7)
+        ax1.axvspan(i-1.45, i-0.55, color='tab:red', alpha=0.15, linewidth=0)
+    ax1.tick_params(axis='x', labelsize=4, width=0.6, length=3.0) #7
+    ax1.tick_params(axis='y', labelsize=4, width=0.5, length=3.0) #7
+    [x.set_linewidth(0.5) for x in ax1.spines.values()]
 
     ax2.yaxis.set_tick_params(labelleft=True)
-    ax2.set_title(f'{p2_ID} Residue Attributions', fontsize=10)
-    ax2.set_ylabel("Attribution Score", fontsize=9, weight = 'bold')
-    ax2.set_xlabel("Residue Index", fontsize=9, weight = 'bold')
+    ax2.set_title(f'{p2_ID} Residue Attributions', fontsize=5) #10
+    ax2.set_ylabel("Attribution Score", fontsize=4, weight = 'bold') #9
+    ax2.set_xlabel("Residue Index", fontsize=4, weight = 'bold') #9
     #ax2.get_xaxis().set_visible(False)
-    ax2.set_xticks(range(0,len(p2_x), 1))
+    ax2.set_xticks(range(0,len(p2_x), 2))
     sns.barplot(x=p2_x, y=p2_node_norm, palette=p2_colors, ax=ax2, hue=p2_x, legend=False)
     for j in p2_gt:
-        ax2.axvspan(j-1.5, j-0.5, color='tab:red', alpha=0.1, linewidth=0)
-    ax2.tick_params(axis='x', labelsize=7)
-    ax2.tick_params(axis='y', labelsize=7)
-    plt.suptitle("Human Insulin Protein Binding Interface (3I40-A/B) Prediction Attribution Scores", fontsize = 12, weight='bold') #change with ideal protein
+        ax2.axvspan(j-1.45, j-0.55, color='tab:red', alpha=0.15, linewidth=0)
+    ax2.tick_params(axis='x', labelsize=4, width=0.5, length=2.0) #9
+    ax2.tick_params(axis='y', labelsize=4, width=0.5, length=2.0) #9
+    [x.set_linewidth(0.5) for x in ax2.spines.values()]
+
+    plt.suptitle("Human Insulin Protein Binding Interface (3I40-A/B) Prediction Attribution Scores", fontsize = 7, weight='bold') #12, change with ideal protein
     plt.tight_layout()
-    plt.savefig(f"codebase/images/{p1_ID[:4]}-attribution.png", dpi=300)
+    plt.subplots_adjust(top=0.72)
+    plt.savefig(f"codebase/images/{p1_ID[:4]}-attribution.pdf", bbox_inches = 'tight', dpi=600)
     plt.close()
 
 def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform, cutoff):
@@ -406,8 +410,8 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
     edgelist = np.load(os.path.join(f'codebase/data/explain-npy/', f'{ID}-combined_edge_list_{cutoff}.npy')).T
 
     f, (ax1, ax2) = plt.subplots(1, 2, dpi=1200)
-    f.set_figwidth(10)
-    f.set_figheight(3)
+    f.set_figwidth(5)
+    f.set_figheight(1.5)
     H = nx.from_edgelist(edgelist) #convert to CPU for graph visualization
     K = nx.Graph() #sprted
     K.add_nodes_from(sorted(H.nodes(data=True)))
@@ -466,8 +470,8 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
         patch_arr.append(mpatches.Patch(color=colors[i], label='Chain ' + str(seq_key_list[i]) + " Interface"))
         orig_patch_arr.append(mpatches.Patch(color=colors[i], label='Chain ' + str(seq_key_list[i])))
 
-    ax1.legend(handles=patch_arr,loc=1, prop={'size':6, 'weight': 'bold'})
-    ax2.legend(handles=patch_arr,loc=1, prop={'size':6, 'weight': 'bold'})
+    ax1.legend(handles=patch_arr,loc=1, prop={'size':3, 'weight': 'bold'}) #6
+    ax2.legend(handles=patch_arr,loc=1, prop={'size':3, 'weight': 'bold'}) #6
     #ax3.legend(handles=orig_patch_arr,loc=1, prop={'size':6})
 
     #relabel to 1-index & by chain
@@ -482,43 +486,47 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
     
     if (n_nodes <= 250):
         #small
-        width = 0.4
-        node_size = 150
-        font_size = 4
+        print("nodes < 250")
+        width = 0.02
+        node_size = 40
+        font_size = 2.5
         #node_size = 800
         #font_size = 14
     elif (n_nodes > 250 and n_nodes <= 750):
-        width = 0.2 #update 
-        node_size = 50
-        font_size = 2
+        width = 0.01 #update 
+        node_size = 20
+        font_size = 1.5
     else:
         #n_nodes > 750
-        width = 0.1
-        node_size = 20
-        font_size = 1
+        width = 0.0025
+        node_size = 10
+        font_size = 0.9
     
     nx.draw_networkx_edges(G=G, pos=pos,width=width, ax=ax1)
     nx.draw_networkx_nodes(G=G, pos=pos, node_color = color_map_ig, node_size=node_size, ax=ax1) #color_map
     nx.draw_networkx_labels(G=G, pos=pos, font_size = font_size, font_weight= 'bold', ax=ax1)
-    ax1.set_title(f"MAPLE-GNN Binding Interface Prediction", fontsize = 10)
+    ax1.set_title(f"MAPLE-GNN Binding Interface Prediction", fontsize = 5) #10
+    [x.set_linewidth(0.5) for x in ax1.spines.values()]
 
     nx.draw_networkx_edges(G=G, pos=pos,width=width, ax=ax2)
     nx.draw_networkx_nodes(G=G, pos=pos, node_color = color_map_gt, node_size=node_size, ax=ax2) #color_map
     nx.draw_networkx_labels(G=G, pos=pos, font_size = font_size, font_weight='bold', ax=ax2)
-    ax2.set_title(f"PDBePISA Ground Truth Annotation", fontsize = 10)
+    ax2.set_title(f"PDBePISA Ground Truth Annotation", fontsize = 5) #10
+    [x.set_linewidth(0.5) for x in ax2.spines.values()]
 
     #nx.draw_networkx_edges(G=G, pos=pos,width=width, ax=ax3)
     #nx.draw_networkx_nodes(G=G, pos=pos, node_color = color_map_original, node_size=node_size, ax=ax3) #color_map
     #nx.draw_networkx_labels(G=G, pos=pos, font_size = font_size, ax=ax3)
     #ax3.set_title(f"Baseline Protein Graph Representation", fontsize = 10)
     
-    strFile = "codebase/images/" + str(ID) + "-combined.png"
+    strFile = "codebase/images/" + str(ID) + "-combined.pdf"
 
      #remove margin box
-    plt.suptitle("Human Insulin (3I40-A/B) Graph-Level Binding Interface Attribution Comparison", fontsize=12, weight = 'bold')
+    plt.suptitle("Human Insulin (3I40-A/B) Graph-Level Binding Interface Attribution Comparison", fontsize=7, weight = 'bold') #12
     #              Human Insulin Protein Binding Interface (3I40-A/B) Prediction Attribution Scores With Integrated Gradients
     plt.tight_layout()
-    plt.savefig(strFile, dpi=300)
+    plt.subplots_adjust(top=0.72)
+    plt.savefig(strFile, bbox_inches = 'tight', dpi=600)
     plt.close()
     
 

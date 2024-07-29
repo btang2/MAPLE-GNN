@@ -836,8 +836,8 @@ class MAPLEGNN(nn.Module):
     def __init__(self, n_output=1, num_node_features = 1024+14, hidden_dim = 128, dropout=0.2, pool_dropout= 0.2): 
         #num_node_features: 1038 for PLM+DSSP, 2256 for PLM+1DMF+DSSP, reduced output dim for space constraint, now 256 for extra features, 3 head attention
         #do somoething here
-        print('Loaded MH GATv2: sagpool edition, GraphConv')
-        super(MH_GATv2_sagpool_GraphConv, self).__init__()
+        print('Loaded MAPLE-GNN')
+        super(MAPLEGNN, self).__init__()
 
         self.hidden_dim = hidden_dim #hyperparameter, though 8 seems to perform best
         self.pool_dropout = pool_dropout
