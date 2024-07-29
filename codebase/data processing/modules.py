@@ -1,30 +1,73 @@
 import os
-import sys
-import Bio
 from Bio.PDB import PDBParser
 from Bio.PDB.DSSP import DSSP
-import requests
+import requests as re
 import numpy as np
 import numpy.linalg as la
-#import scipy as sp
 import networkx as nx
-import requests as r
 import matplotlib.pyplot as plt
-import warnings
 from transformers import T5EncoderModel, T5Tokenizer
 import torch
-import re
-import time
 from helpers import feat_engg_manual_main
 import matplotlib.patches as mpatches 
-import py3Dmol
+
+#main module for data processing
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-#from pathlib import Path
-#path_root = Path(__file__).parents[1]  # upto 'codebase' folder
-#sys.path.insert(0, str(path_root))
-# print(sys.path)
+def ID_to_essentials(ID, chainid, explain = False):
+    #parse PDB and extract essential information
+    d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K', 'ILE': 'I', 'PRO': 'P', 'THR': 'T', 'PHE': 'F', 'ASN': 'N', 'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W', 'ALA': 'A', 'VAL':'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M'}
+    seq_dict = {}
+    p = PDBParser(QUIET=True)
+    chain_found = False
+    if (explain):
+        structure = p.get_structure(id=ID, file = "codebase/data/explain-pdb/" + str(ID) + ".pdb")
+    else:
+        structure = p.get_structure(id=ID, file = "codebase/data/pdb/" + str(ID) + ".pdb") #get PDB
+    model = structure[0]
+    residue_to_remove = []
+    chain_to_remove = []
+    for chain in model:
+        if (chain.id == chainid):
+            chain_found = True
+        seq = ""
+        for residue in chain:
+            hetero_flag = residue.id[0].strip()
+            if not hetero_flag:
+                if (residue.resname in d3to1.keys()):
+                    seq += d3to1[residue.resname]
+                elif(len(residue.resname) != 3):
+                    break 
+                else:
+                    seq += 'X'
+        if(len(seq) <= 1):
+            chain_to_remove.append(chain.id) #chain of hetatm's/extraneous chain 
+        else:
+            seq_dict[chain.id] = str(seq)
+
+    for residue in list(residue_to_remove):
+        model[residue[0]].detach_child(residue[1])
+
+    for chain in list(chain_to_remove):
+        model.detach_child(chain)
+
+    seq_key_list = list(seq_dict.keys())
+    seq_lenptr = np.zeros(len(seq_key_list) + 1, dtype=int) #similar to CSR rowptr; shows where each sequence starts and stops
+    seq_lenptr[0] = 0
+    seq_key_to_idx = {}
+    for i in range(len(seq_key_list)):
+        chain_id = seq_key_list[i]
+        seq_key_to_idx[chain_id] = i
+        seq_lenptr[i+1] = seq_lenptr[i] + len(seq_dict[chain_id]) #specifically, chain_id of seq_key_list[i] goes from index seq_lenptr[i] to seq_lenptr[i+1]-1
+        #& notably, seq_lenptr[-1] = length of the whole concatenated sequence
+    #print("seq_lenptr: " + str(seq_lenptr))
+    #print(seq_dict)
+    #print(seq_lenptr)
+    if (not chain_found):
+        raise Exception("Chain not found: PDB ID " + str(ID) + ", attempted chain: " + str(chainid))
+    
+    return seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx
 
 def PDB_to_DSSP(ID, chainid, seq_dict, explain = False):
     seq_key_list = list(seq_dict.keys())
@@ -105,26 +148,20 @@ def PDB_to_DSSP(ID, chainid, seq_dict, explain = False):
     return dssp_feat
     
 def seq_to_PLM_embedding(seq_dict):
+    #Generate batched per-chain PLM embeddings
     seq_key_list = list(seq_dict.keys())
     #adapted from ProtTrans5 Quickstart Guide
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # Load the tokenizer
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Load tokenizer
     tokenizer = T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc', do_lower_case=False)
-
-    # Load the model
+    # Load model
     model = T5EncoderModel.from_pretrained("Rostlab/prot_t5_xl_half_uniref50-enc").to(device)
-
-    # only GPUs support half-precision currently; if you want to run on CPU use full-precision (not recommended, much slower)
-    #if device==torch.device("cpu"):
-        #model.to(torch.float32) 
 
     #protein sequence preprepared
     # replace all rare/ambiguous amino acids by X and introduce white-space between all amino acids
     sequence_examples = []
     for i in seq_key_list:
         sequence_examples.append(seq_dict[i])
-    #print(sequence_examples)
-    #print(len(sequence_examples[0]))
     sequence_examples = [" ".join(list(re.sub(r"[UZOB]", "X", sequence))) for sequence in sequence_examples]
 
     # tokenize sequences and pad up to the longest sequence in the batch
@@ -148,16 +185,14 @@ def seq_to_PLM_embedding(seq_dict):
     #emb_0_per_protein = emb_0.mean(dim=0) # shape (1024)
 
 def seq_to_PLM_embedding_low_memory(seq):
+    #PLM embeddings using sequence as input
     #adapted from ProtTrans5 Quickstart Guide
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # Load the tokenizer
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Load tokenizer
     tokenizer = T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc', do_lower_case=False)
-
-    # Load the model
+    # Load model
     model = T5EncoderModel.from_pretrained("Rostlab/prot_t5_xl_half_uniref50-enc").to(device)
     sequence_examples = [seq]
-    #print(sequence_examples)
-    #print(len(sequence_examples[0]))
     sequence_examples = [" ".join(list(re.sub(r"[UZOB]", "X", sequence))) for sequence in sequence_examples]
 
     # tokenize sequences and pad up to the longest sequence in the batch
@@ -177,68 +212,10 @@ def seq_to_PLM_embedding_low_memory(seq):
     # if you want to derive a single representation (per-protein embedding) for the whole protein
     #emb_0_per_protein = emb_0.mean(dim=0) # shape (1024)
 
-def ID_to_essentials(ID, chainid, explain = False):
-    d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K', 'ILE': 'I', 'PRO': 'P', 'THR': 'T', 'PHE': 'F', 'ASN': 'N', 'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W', 'ALA': 'A', 'VAL':'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M'}
-    seq_dict = {}
-    p = PDBParser(QUIET=True)
-    chain_found = False
-    if (explain):
-        structure = p.get_structure(id=ID, file = "codebase/data/explain-pdb/" + str(ID) + ".pdb")
-    else:
-        structure = p.get_structure(id=ID, file = "codebase/data/pdb/" + str(ID) + ".pdb") #get PDB
-    model = structure[0]
-    residue_to_remove = []
-    chain_to_remove = []
-    for chain in model:
-        if (chain.id == chainid):
-            chain_found = True
-            #print("found the chain!")
-        seq = ""
-        for residue in chain:
-            hetero_flag = residue.id[0].strip()
-            if not hetero_flag:
-                if (residue.resname in d3to1.keys()):
-                    seq += d3to1[residue.resname]
-                elif(len(residue.resname) != 3):
-                    break #not a protein chain, Bugged?
-                    #donothing = True
-                else:
-                    seq += 'X'
-        if(len(seq) <= 1):
-            chain_to_remove.append(chain.id) #chain of hetatm's/extraneous chain (remove, required for 1DMF to function properly)
-        else:
-            #print(len(seq))
-            seq_dict[chain.id] = str(seq)
-
-    for residue in list(residue_to_remove):
-        model[residue[0]].detach_child(residue[1])
-
-    for chain in list(chain_to_remove):
-        model.detach_child(chain)
-
-    seq_key_list = list(seq_dict.keys())
-    seq_lenptr = np.zeros(len(seq_key_list) + 1, dtype=int) #similar to CSR rowptr; shows where each sequence starts and stops
-    seq_lenptr[0] = 0
-    seq_key_to_idx = {}
-    for i in range(len(seq_key_list)):
-        chain_id = seq_key_list[i]
-        seq_key_to_idx[chain_id] = i
-        seq_lenptr[i+1] = seq_lenptr[i] + len(seq_dict[chain_id]) #specifically, chain_id of seq_key_list[i] goes from index seq_lenptr[i] to seq_lenptr[i+1]-1
-        #& notably, seq_lenptr[-1] = length of the whole concatenated sequence
-    #print("seq_lenptr: " + str(seq_lenptr))
-    #print(seq_dict)
-    #print(seq_lenptr)
-    if (not chain_found):
-        raise Exception("Chain not found: PDB ID " + str(ID) + ", attempted chain: " + str(chainid))
-    
-    return seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx
-
 def PDB_to_coord_dict(ID, seq_dict, seq_key_list, seq_key_to_idx, seq_lenptr, explain = False):
-    #first, convert PDB to list of coords
-    #how to "average" coords of atoms to obtain coord of residue? use alpha-carbon
+    #Extract residue-level coordinate data from PDB files
     coord_dict = {}
     cur_idx = 0
-    #print("Extracting Chain Information -- START")
     p = PDBParser(QUIET=True)
     if (explain):
         structure = p.get_structure(id=ID, file = "codebase/data/explain-pdb/" + str(ID) + ".pdb")
@@ -255,42 +232,26 @@ def PDB_to_coord_dict(ID, seq_dict, seq_key_list, seq_key_to_idx, seq_lenptr, ex
             if not hetero_flag:
                 if(len(residue.resname) != 3):
                     print("couldn't locate " + residue.resname)
-                    break #not a protein chain, maybe bugged?
+                    break 
                 try:
                     coord_dict[cur_idx] = residue['CA'].coord
                     cur_idx += 1
                 except:
-                    #no Carbon Atom??? probably not an amino acid, continue for now ?
                     continue
-                    x = 0.0
-                    y = 0.0
-                    z = 0.0
-                    num_atms = 0
-                    for atom in residue:
-                        x += atom.coord[0]
-                        y += atom.coord[1]
-                        z += atom.coord[2]
-                        num_atms += 1
-                    print("NO ALPHA-CARBON at index " + str(cur_idx) + ". Residue name: " + str(residue.resname) + ", averaging")
-                    if (num_atms == 0):
-                        print("ERROR: trying to process residue with no atoms")
-                    coord_dict[cur_idx] = np.array([x/num_atms, y/num_atms, z/num_atms])
-                
-        
-
+    
     for residue in list(residue_to_remove):
         model[residue[0]].detach_child(residue[1])
 
     for chain in list(chain_to_remove):
         model.detach_child(chain)
 
-    
-    #print("Extracting Chain Information -- END")
     return coord_dict
             
 def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, explain = False):
+    #generate node feature matrix for specified protein
+    #originally developed to process multiple chains -- only one chain per protein is used in PPI database
+    
     #generate ProtTrans T5 LLM embedding
-    #print("Generating Node Features -- PLM embedding -- START")
     #emb_dict = {}
     #try:
     #emb_dict = seq_to_PLM_embedding(seq_dict[chainid])
@@ -302,15 +263,14 @@ def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, expl
         #for seq_key in seq_key_list:
         #    emb_dict[seq_key] = seq_to_PLM_embedding_low_memory(seq_dict[seq_key]) #Likely Bugged
         #    torch.cuda.empty_cache()
-    #print("Generating Node Features -- PLM Embedding -- END")
-    #for chain_id in seq_key_list:
-    #    print("chain " + chain_id + " embedding dims: " + str(emb_dict[chain_id].shape))
 
-    #generate 1DMF from sequence
-    #possible bug/confounder: AC30 generates NaN values, most likely bug with original fasta file as I cannot seem to reproduce it
-    #print("Generating Node Features -- 1DMF -- START")
-    #mf_dict = {}
+    #generate 1DMF from sequence (no longer used in MAPLE-GNN implementation)
     feature_type_lst = ['AC30', 'PSAAC15', 'ConjointTriad', 'LD10_CTD']
+    seq_manual_feat_dict = feat_engg_manual_main.extract_prot_seq_1D_manual_feat(root_path="codebase/data processing/helpers/", prot_seq = seq_dict[chainid], feature_type_lst = feature_type_lst, deviceType='cuda:0')
+    mf_feat = torch.cat((torch.tensor(seq_manual_feat_dict['AC30']), torch.tensor(seq_manual_feat_dict['PSAAC15']), torch.tensor(seq_manual_feat_dict['ConjointTriad']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_C']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_T']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_D'])))
+    mf_feat = mf_feat.repeat(len(seq_dict[chainid]),1).to(device)
+
+    #mf_dict = {}
     #for chain_id in seq_key_list:
         #print(chain_id)
         #print(seq_dict[chain_id])
@@ -318,14 +278,15 @@ def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, expl
         #mf_feat = torch.cat((torch.tensor(seq_manual_feat_dict['AC30']), torch.tensor(seq_manual_feat_dict['PSAAC15']), torch.tensor(seq_manual_feat_dict['ConjointTriad']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_C']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_T']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_D'])))
         #mf_feat = mf_feat.repeat(len(seq_dict[chain_id]),1).to(device)
         #mf_dict[chain_id] = mf_feat
-    seq_manual_feat_dict = feat_engg_manual_main.extract_prot_seq_1D_manual_feat(root_path="codebase/data processing/helpers/", prot_seq = seq_dict[chainid], feature_type_lst = feature_type_lst, deviceType='cuda:0')
-    mf_feat = torch.cat((torch.tensor(seq_manual_feat_dict['AC30']), torch.tensor(seq_manual_feat_dict['PSAAC15']), torch.tensor(seq_manual_feat_dict['ConjointTriad']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_C']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_T']), torch.tensor(seq_manual_feat_dict['LD10_CTD_ConjointTriad_D'])))
-    mf_feat = mf_feat.repeat(len(seq_dict[chainid]),1).to(device)
-    #print("Generating Node Features -- 1DMF -- END")
-    #for chain_id in seq_key_list:
-    #    print("chain " + chain_id + " 1DMF dims: " + str(mf_dict[chain_id].shape))
     
-    #print("Generating Node Features -- DSSP -- START")
+    #generate DSSP embedding using DSSP software
+    try:
+        dssp_feat = PDB_to_DSSP(ID=ID, chainid = chainid, seq_dict=seq_dict, explain=explain)
+    except Exception as e:
+        print("DSSP error: " + str(e) + ", assigning default")
+        default_dssp = torch.tensor([[0.0,     0.0,     1.0,     1.0,   0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]).to(device)
+        dssp_feat = default_dssp.repeat(len(seq_dict[chainid]), 1)
+    
     #dssp_dict = {}
     #try:
     #    dssp_dict = PDB_to_DSSP(ID=ID,seq_dict=seq_dict, explain=explain)
@@ -334,30 +295,11 @@ def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, expl
     #    default_dssp = torch.tensor([[0.0,     0.0,     1.0,     1.0,   0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]).to(device)
     #    for chain_id in seq_key_list:
     #        dssp_feature = default_dssp.repeat(len(seq_dict[chain_id]), 1) #create DSSP feature matrix (n x 14) & save to dict
-            #print(np.shape(dssp_feature))
+    #        print(np.shape(dssp_feature))
     #        dssp_dict[chain_id] = dssp_feature
-    try:
-        dssp_feat = PDB_to_DSSP(ID=ID, chainid = chainid, seq_dict=seq_dict, explain=explain)
-    except Exception as e:
-        print("DSSP error: " + str(e) + ", assigning default")
-        default_dssp = torch.tensor([[0.0,     0.0,     1.0,     1.0,   0.0 , 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]).to(device)
-        dssp_feat = default_dssp.repeat(len(seq_dict[chainid]), 1)
-
-
-    #print("Generating Node Features -- DSSP -- END")
-    #print(dssp_dict)
-    #print(dssp_feat.shape)
-    #construct concatenated node feature matrix (does not depend on)
-    #print("Generating Node Features -- Feature Vector Concatenation -- START")
-    #node_feat_matrix = torch.tensor(np.zeros((seq_lenptr[-1], 2256))).to(device)
-    #for i in range(len(seq_key_list)):
-    #    chain_id = seq_key_list[i]
-        #node_feat_dict[chain_id] = torch.cat((emb_dict[chain_id], mf_dict[chain_id], dssp_dict[chain_id]), dim=1).to(device)
-    #    node_feat_matrix[seq_lenptr[i]:seq_lenptr[i+1],] = torch.cat((emb_dict[chain_id], mf_dict[chain_id], dssp_dict[chain_id]), dim=1).to(device) #should be working based on how seq-lenptr works
-        #print(str(chain_id) + " feature matrix shape: " + str(node_feat_dict[chain_id].shape))
-        #node_feat_matrix = torch.cat((node_feat_matrix, node_feat_dict[chain_id]),dim=0)
-    #print("Generating Node Features -- Feature Vector Concatenation -- END")
     
+
+    #Construct concatenated node feature matrix
     node_feat_matrix = torch.tensor(np.zeros((len(seq_dict[chainid]), 2256))).to(device)
     node_feat_matrix = torch.cat((plm_feat, mf_feat, dssp_feat), dim=1).to(device)
 
@@ -380,6 +322,14 @@ def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, expl
         ld = normalize(ld).copy()
         node_feat_matrix[i,:] = np.concatenate((prott5, ac, pseaac, ct, ld, dssp))
 
+    #node_feat_matrix = torch.tensor(np.zeros((seq_lenptr[-1], 2256))).to(device)
+    #for i in range(len(seq_key_list)):
+    #    chain_id = seq_key_list[i]
+        #node_feat_dict[chain_id] = torch.cat((emb_dict[chain_id], mf_dict[chain_id], dssp_dict[chain_id]), dim=1).to(device)
+    #    node_feat_matrix[seq_lenptr[i]:seq_lenptr[i+1],] = torch.cat((emb_dict[chain_id], mf_dict[chain_id], dssp_dict[chain_id]), dim=1).to(device) #should be working based on how seq-lenptr works
+        #print(str(chain_id) + " feature matrix shape: " + str(node_feat_dict[chain_id].shape))
+        #node_feat_matrix = torch.cat((node_feat_matrix, node_feat_dict[chain_id]),dim=0)
+
     return torch.from_numpy(node_feat_matrix)
 
     #generate Node Feature matrix (n x 2256), concat wrt seq_key_list order; since all features generated per-chain the order should not affect the graph implementation
@@ -388,9 +338,7 @@ def generate_node_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, expl
     #print ("Node Feature Matrix Dimensions:  " + str(node_features.shape))
 
 def generate_edge_features(coord_dict, angstrom_cutoff):
-    #this purely depends on the coordinates; everything else is encoded in indices/etc already, runtime should be o(n^2)
-    #adj_matrix = torch.tensor(np.zeros((len(coord_dict), len(coord_dict)), dtype=int)).to(device)
-    #edge_features = torch.tensor(np.zeros((len(coord_dict), len(coord_dict), 2))).to(device) #features are spatial distance encoding & sequence distance encoding
+    #Generate edge lists and edge features given PDB coordinate dictionary and angstrom cutoff threshold
     edge_list = torch.empty((0,2), dtype=torch.long).to(device)
     edge_features = torch.empty(0,2).to(device)
     for i in range(len(coord_dict)):
@@ -399,31 +347,18 @@ def generate_edge_features(coord_dict, angstrom_cutoff):
                 dist_ij = la.norm(coord_dict[i] - coord_dict[j], ord=2)
                 edge_list = torch.cat((edge_list, torch.from_numpy(np.array([[i,j]])).to(device)),0)
                 edge_features = torch.cat((edge_features, torch.from_numpy(np.array([[(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]])).to(device)), 0)
-                #adj_matrix[i][j] = 1 #i=j, just process once
-                #edge_features[i][j] = torch.tensor([(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]).to(device)
             else:
                 dist_ij = la.norm(coord_dict[i] - coord_dict[j], ord=2)
                 if (dist_ij < angstrom_cutoff):
-                    #edge
                     edge_list = torch.cat((edge_list, torch.from_numpy(np.array([[i,j]])).to(device)),0)
                     edge_features = torch.cat((edge_features, torch.from_numpy(np.array([[(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]])).to(device)), 0)
                     edge_list = torch.cat((edge_list, torch.from_numpy(np.array([[j,i]])).to(device)),0)
                     edge_features = torch.cat((edge_features, torch.from_numpy(np.array([[(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]])).to(device)), 0)
-                    #adj_matrix[i][j] = 1
-                    #adj_matrix[j][i] = 1
-                    #edge_features[i][j] = torch.tensor([(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]).to(device)
-                    #edge_features[i][j] = torch.tensor([(angstrom_cutoff - dist_ij)/(angstrom_cutoff), np.abs(j-i)/len(coord_dict)]).to(device)
-                else:
-                    #no edge
-                    no_edge = True
-                    #edge_features[i][j] = torch.tensor([0,0]).to(device)
-                    #edge_features[j][i] = torch.tensor([0,0]).to(device)
+
     return edge_list.T, edge_features
 
 def generate_alternate_edge_features(coord_dict):
-    #this purely depends on the coordinates; everything else is encoded in indices/etc already, runtime should be o(n^2)
-    #adj_matrix = torch.tensor(np.zeros((len(coord_dict), len(coord_dict)), dtype=int)).to(device)
-    #edge_features = torch.tensor(np.zeros((len(coord_dict), len(coord_dict), 2))).to(device) #features are spatial distance encoding & sequence distance encoding
+    #Generate alternate cutoff edge feature (in bulk & in parallel), (6, 7, 8, 9, 10)
 
     edge_list_6 = torch.empty((0,2), dtype=torch.long).to(device)
     edge_features_6 = torch.empty(0,2).to(device)
@@ -484,9 +419,7 @@ def generate_alternate_edge_features(coord_dict):
                 
     return edge_list_6.T, edge_list_7.T, edge_list_8.T, edge_list_9.T, edge_list_10.T, edge_features_6, edge_features_7, edge_features_8, edge_features_9, edge_features_10
 def generate_alternate_edge_features2(coord_dict):
-    #this purely depends on the coordinates; everything else is encoded in indices/etc already, runtime should be o(n^2)
-    #adj_matrix = torch.tensor(np.zeros((len(coord_dict), len(coord_dict)), dtype=int)).to(device)
-    #edge_features = torch.tensor(np.zeros((len(coord_dict), len(coord_dict), 2))).to(device) #features are spatial distance encoding & sequence distance encoding
+    #Generate alternate cutoff edge feature (in bulk & in parallel), (6.5, 7.5, 8.5, 9.5)
 
     edge_list_6_5 = torch.empty((0,2), dtype=torch.long).to(device)
     edge_features_6_5 = torch.empty(0,2).to(device)
@@ -538,8 +471,8 @@ def generate_alternate_edge_features2(coord_dict):
                 
     return edge_list_6_5.T, edge_list_7_5.T, edge_list_8_5.T, edge_list_9_5.T, edge_features_6_5, edge_features_7_5, edge_features_8_5, edge_features_9_5
 
-
 def save_alternate_edges(ID):
+    #save alternate edge features for cutoffs 6, 7, 8, 9, 10
     seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=str(ID))
     coord_dict = PDB_to_coord_dict(ID=ID, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_key_to_idx = seq_key_to_idx, seq_lenptr=seq_lenptr)
     edge_list_6, edge_list_7, edge_list_8, edge_list_9, edge_list_10, edge_features_6, edge_features_7, edge_features_8, edge_features_9, edge_features_10 = generate_alternate_edge_features(coord_dict)
@@ -555,6 +488,7 @@ def save_alternate_edges(ID):
     np.save("codebase/data/npy/" + str(ID) + "-edge_feat_9.npy", edge_features_9.cpu().numpy()) 
     np.save("codebase/data/npy/" + str(ID) + "-edge_feat_10.npy", edge_features_10.cpu().numpy()) 
 def save_alternate_edges2(ID):
+    #save alternate edge features for cutoffs 6.5, 7.5, 8.5, 9.5
     seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=str(ID))
     coord_dict = PDB_to_coord_dict(ID=ID, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_key_to_idx = seq_key_to_idx, seq_lenptr=seq_lenptr)
     edge_list_6_5, edge_list_7_5, edge_list_8_5, edge_list_9_5, edge_features_6_5, edge_features_7_5, edge_features_8_5, edge_features_9_5 = generate_alternate_edge_features2(coord_dict)
@@ -568,15 +502,10 @@ def save_alternate_edges2(ID):
     np.save("codebase/data/npy/" + str(ID) + "-edge_feat_8_5.npy", edge_features_8_5.cpu().numpy()) 
     np.save("codebase/data/npy/" + str(ID) + "-edge_feat_9_5.npy", edge_features_9_5.cpu().numpy()) 
 
-
 def save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx):
     #save node and edge features in .npy compressed format to avoid recomputation
-    #print("Saving Features for Protein: " + str(ID))
-    #print("Generating Node Features -- START")
-    node_feat_matrix = generate_node_features(ID=ID, chainid = chainid, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr) #that's so clean
-    #print(np.shape(node_feat_matrix))
+    node_feat_matrix = generate_node_features(ID=ID, chainid = chainid, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr)
     np.save("codebase/data/npy/" + str(ID) + "-node_feat.npy", node_feat_matrix.cpu().numpy())
-    #print("Generating Node Features -- END")
     coord_dict = PDB_to_coord_dict(ID=ID, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_key_to_idx = seq_key_to_idx, seq_lenptr=seq_lenptr)
     for i in range(len(seq_key_list)):
         #i-th chain: seq_lenptr[i] <= x < seq_lenptr[i+1]
@@ -587,7 +516,6 @@ def save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_key_to_id
             for j in range(len(coord_list)):
                 coord_list[j] = (coord_list[j][0] - seq_lenptr[i],) + coord_list[j][1:]
             chain_coord_dict = dict(coord_list)
-    #print("Generating Adjacency Matrix and Edge Features -- START")
     edge_list_6, edge_list_7, edge_list_8, edge_list_9, edge_list_10, edge_features_6, edge_features_7, edge_features_8, edge_features_9, edge_features_10 = generate_alternate_edge_features(chain_coord_dict)
     np.save("codebase/data/npy/" + str(ID) + "-edge_list_6.npy", edge_list_6.cpu().numpy())
     np.save("codebase/data/npy/" + str(ID) + "-edge_list_7.npy", edge_list_7.cpu().numpy())
@@ -619,16 +547,6 @@ def save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_key_to_id
     print(str(np.shape(edge_list_9_5.cpu().numpy())))
     print(str(np.shape(edge_features_9_5.cpu().numpy())))
     """
-    #edge_list, edge_features = generate_edge_features(coord_dict=coord_dict, chainid = chainid, angstrom_cutoff=ang_cutoff) #angstrom cutoff should be float
-
-    #assert edge_list.max() < len(node_feat_matrix) #for continuity -- bring back
-    #print("Generating Adjacency Matrix and Edge Features -- END")
-    #print("Saving Results to numpy -- START")
-    
-    #np.save("codebase/data/npy/" + str(ID) + "-edge_list.npy", edge_list.cpu().numpy())
-    #np.save("codebase/data/npy/" + str(ID) + "-edge_feat.npy", edge_features.cpu().numpy()) 
-    #print("Saving Results to numpy -- END")
-    #store adj_matrix in house to avoid recomputing; eventually it'll all be from here   
 
 def normalize(x):
     max = np.max(x)
@@ -637,17 +555,12 @@ def normalize(x):
         return x-min #reduce overflow, possibility of all zeros
     else:
         return (x-min)/(max-min)
-#only for explanations
 
 def explain_save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx):
-    #save node and edge features in .npy compressed format to avoid recomputation
-    #print("Saving Features for Protein: " + str(ID))
-    #print("Generating Node Features -- START")
+    #Save features of specific chains for post-hoc explanation in codebase/data/explain-npy
     node_feat = generate_node_features(ID=ID, chainid = chainid, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr, explain=True).cpu().numpy() #that's so clean
-    #print(np.shape(node_feat_matrix))
     np.save("codebase/data/explain-npy/" + str(ID) + "-" + str(chainid) + "-node_feat.npy", node_feat)
     node_feat_norm = np.zeros((node_feat.shape[0], 1024+1218+14)) #PLM + 1DMF + DSSP
-    #print(str(np.shape(node_feat[:,:1024])) + " " + str(np.shape(node_feat[:,2242:])))
     for i in range(len(node_feat)):
         prott5 = node_feat[i,:1024]
         ac = node_feat[i, 1024:1234]
@@ -664,7 +577,6 @@ def explain_save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_k
         ct = normalize(ct).copy()
         ld = normalize(ld).copy()
         node_feat_norm[i,:] = np.concatenate((prott5, ac, pseaac, ct, ld, dssp))
-    #print(str(np.shape(node_feat_1dmf_remove)))
     np.save("codebase/data/explain-npy/" + str(ID) + "-" + str(chainid) + "-node_feat_normalized.npy", node_feat_norm)
     #print("Generating Node Features -- END")
     coord_dict = PDB_to_coord_dict(ID=ID, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_key_to_idx = seq_key_to_idx, seq_lenptr=seq_lenptr, explain=True)
@@ -701,41 +613,22 @@ def explain_save_features(ID, chainid, seq_dict, seq_key_list, seq_lenptr, seq_k
     np.save("codebase/data/explain-npy/" + str(ID) + "-" + str(chainid) + "-edge_feat_7_5.npy", edge_features_7_5.cpu().numpy()) 
     np.save("codebase/data/explain-npy/" + str(ID) + "-" + str(chainid) + "-edge_feat_8_5.npy", edge_features_8_5.cpu().numpy()) 
     np.save("codebase/data/explain-npy/" + str(ID) + "-" + str(chainid) + "-edge_feat_9_5.npy", edge_features_9_5.cpu().numpy()) 
-    """
-    print(str(np.max(edge_list_7.cpu().numpy())))
-    print(str(np.shape(edge_list_7.cpu().numpy())))
-    print(str(np.shape(edge_features_7.cpu().numpy())))
-    print(str(np.max(edge_list_9_5.cpu().numpy())))
-    print(str(np.shape(edge_list_9_5.cpu().numpy())))
-    print(str(np.shape(edge_features_9_5.cpu().numpy())))
-    """
-    #edge_list, edge_features = generate_edge_features(coord_dict=coord_dict, chainid = chainid, angstrom_cutoff=ang_cutoff) #angstrom cutoff should be float
-
-    #assert edge_list.max() < len(node_feat_matrix) #for continuity -- bring back
-    #print("Generating Adjacency Matrix and Edge Features -- END")
-    #print("Saving Results to numpy -- START")
-    
-    #np.save("codebase/data/npy/" + str(ID) + "-edge_list.npy", edge_list.cpu().numpy())
-    #np.save("codebase/data/npy/" + str(ID) + "-edge_feat.npy", edge_features.cpu().numpy()) 
-    #print("Saving Results to numpy -- END")
-    #store adj_matrix in house to avoid recomputing; eventually it'll all be from here   
 
 def ID_to_explain_graph(ID, chainid):
     seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=ID, chainid=chainid, explain=True)
     explain_save_features(ID=ID, chainid=chainid, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr, seq_key_to_idx=seq_key_to_idx) #codebase/data/npy/ID-node_feat or ID-edge_feat or ID-edge_list
 
-def ID_to_save_graph(ID, chainid, ang_cutoff=6.0):
+def ID_to_save_graph(ID, chainid, ang_cutoff=9.0):
     seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=str(ID), chainid=chainid)
     save_features(ID=ID, chainid=chainid, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr, seq_key_to_idx=seq_key_to_idx, ang_cutoff=ang_cutoff) #codebase/data/npy/ID-node_feat or ID-edge_feat or ID-edge_list
 
 def fetch_pdb_file(pdb_id):
     the_url = "https://files.rcsb.org/download/" + pdb_id
     #the_url = "https://files.wwpdb.org/download/" + pdb_id
-    page = requests.get(the_url)
+    page = re.get(the_url)
     pdb_file = page.content.decode('utf-8')
     pdb_file = pdb_file.replace('\\n', '\n')
     return(pdb_file)
-
 
 def visualize_graph(ID, ang_cutoff, adj_matrix, seq_lenptr, seq_key_list):
     #note input is ADJACENCY MATRIX, not EDGE LIST
@@ -789,9 +682,8 @@ def visualize_graph(ID, ang_cutoff, adj_matrix, seq_lenptr, seq_key_list):
     plt.subplots_adjust(top=0.95) #better visuals
     plt.savefig(strFile, bbox_inches = "tight")
 
+"""
 if __name__ == '__main__':
-    #get_dssp(ID="1tup", ref_seq="SSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNT")
-    #print(PDB_to_DSSP("1tup", "codebase/data/pdb/1tup.pdb"))
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     #Protein PDB id & sequence from ID
@@ -800,7 +692,10 @@ if __name__ == '__main__':
     #ID = "1a3n" #hemoglobin (4-chain, medium)
     #ID = "1tup" #P53 tumor suppressor (3-chain, medium)
     #ID = "3os8" #estrogen receptor (4-chain, large)
-    explanation_pairs = [("1TUP", "A"), ("1TUP", "B"), ("6EC0", "A"), ("6EC0", "B"), ("1GRI", "A"), ("1GRI", "B"), ("1BUW", "C"), ("1BUW", "D"), ("3OS8", "A"), ("3OS8", "C"), ("1RFB", "A"), ("1RFB", "B"), ("1AGN", "C"), ("1AGN", "D"), ("5I6Z", "B"), ("5I6Z", "C"), ("7AOS", "A"), ("7AOS", "B"), ("1BJ1", "H"), ("1BJ1", "L"), ("8J7F", "C"), ("8J7F", "D"), ("3I40", "A"), ("3I40", "B"), ("6DDF", "A"), ("6DDF", "R"), ("1IZN", "C"), ("1IZN", "D"), ("1FIN", "A"), ("1FIN", "B"), ("1RUZ", "L"), ("1RUZ", "M"), ("7K43", "B"), ("7K43", "C"), ("2AAI", "A"), ("2AAI", "B"), ("3IFL", "H"), ("3IFL", "L"), ("1BR1", "A"), ("1BR1", "B"), ("3RU8", "H"), ("3RU8", "X")]
+    
+    #explanation_pairs = [("1TUP", "A"), ("1TUP", "B"), ("6EC0", "A"), ("6EC0", "B"), ("1GRI", "A"), ("1GRI", "B"), ("1BUW", "C"), ("1BUW", "D"), ("3OS8", "A"), ("3OS8", "C"), ("1RFB", "A"), ("1RFB", "B"), ("1AGN", "C"), ("1AGN", "D"), ("5I6Z", "B"), ("5I6Z", "C"), ("7AOS", "A"), ("7AOS", "B"), ("1BJ1", "H"), ("1BJ1", "L"), ("8J7F", "C"), ("8J7F", "D"), ("3I40", "A"), ("3I40", "B"), ("6DDF", "A"), ("6DDF", "R"), ("1IZN", "C"), ("1IZN", "D"), ("1FIN", "A"), ("1FIN", "B"), ("1RUZ", "L"), ("1RUZ", "M"), ("7K43", "B"), ("7K43", "C"), ("2AAI", "A"), ("2AAI", "B"), ("3IFL", "H"), ("3IFL", "L"), ("1BR1", "A"), ("1BR1", "B"), ("3RU8", "H"), ("3RU8", "X")]
+
+    #explanation_pairs = [("4HHB", "C"), ("4HHB", "D")]
     for (ID, chainid) in explanation_pairs:
         ID = ID.lower()
         if (not os.path.exists("codebase/data/explain-pdb/" + str(ID) + ".pdb")):
@@ -813,19 +708,9 @@ if __name__ == '__main__':
         ID_to_explain_graph(ID.lower(), chainid)
     #seq_dict, seq_key_list, seq_lenptr, seq_key_to_idx = ID_to_essentials(ID=str(ID), chainid="A")
     #PDB_to_DSSP(ID, "A", seq_dict)
-    #ang_cutoff = 6.0 #constant for now, seems reasonable for academia & visualization
-    
+    #ang_cutoff = 9.0
     #ID_to_save_graph(ID, chainid='A')
-
-    #ID_to_chain_graph(ID)
-    #only need to run once per protein (although must keep ang_cutoff the same)
-    #save_features(ID=ID, seq_dict=seq_dict, seq_key_list=seq_key_list, seq_lenptr=seq_lenptr, seq_key_to_idx=seq_key_to_idx, ang_cutoff=ang_cutoff) #codebase/data/npy/ID-node_feat or ID-edge_feat or ID-edge_list
-    #edge_list = np.load("codebase/data/npy/" + str(ID) + "-edge_list.npy")
-    #print(str(np.shape(edge_list)))
-    #print("Visualizing Graph")
-    #adj_matrix = np.load("codebase/data/npy/" + str(ID) + "-adj.npy")
-    #visualize_graph(ID=ID, ang_cutoff=ang_cutoff, adj_matrix= adj_matrix, seq_lenptr=seq_lenptr, seq_key_list=seq_key_list)
-    
+"""
 
 
 

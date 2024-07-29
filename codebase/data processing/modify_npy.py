@@ -1,14 +1,11 @@
-#modify npy feature vector arrays to remove 1dmf
+#modify npy feature vectors to include selected features
+
 import numpy as np
 import os
 with open('list_of_prots.txt', 'r') as f:
     data_list = f.read().strip().split('\n')
     
 pdb_list = []
-
-def perc_err(num_err):
-    #calculate percentage of errors
-    return np.round((100.0 * num_err) / 4034.0, 2)
 
 for data in data_list:
     pdb_list.append(data.strip().split('\t')[1].lower())
@@ -66,8 +63,7 @@ def normalize_pdbs():
 
 def reduce_dim():
     count = 0
-    for pdb in pdb_list: #4034 or something
-        #pdb id = pdb
+    for pdb in pdb_list: 
         if (count % 1000 == 0):
             print("reprocessed " + str(count) + " of " + str(len(pdb_list)) + " PDBs (normalized)")
         count += 1
@@ -80,16 +76,11 @@ def reduce_dim():
             #print(np.shape(node_feat))
             #break
         node_feat = np.load("codebase/data/npy/" + str(pdb) + "-node_feat_normalized.npy") #should be (n, 2256) where n is # of available residues in PDB
-        node_feat_1dmf_remove = np.zeros((node_feat.shape[0], 1024+14)) #1024 for PLM, 1024+14 for PLM+DSSP, 1024+1218 for PLM+1DMF, 1024+1218+14 for PLM+1DMF+DSSP
+        node_feat_reduced = np.zeros((node_feat.shape[0], 1024+14)) #1024 for PLM, 1024+14 for PLM+DSSP, 1024+1218 for PLM+1DMF, 1024+1218+14 for PLM+1DMF+DSSP
         #print(str(np.shape(node_feat[:,:1024])) + " " + str(np.shape(node_feat[:,2242:])))
-        node_feat_1dmf_remove[:,:1024] = node_feat[:,:1024] #PLM
-        node_feat_1dmf_remove[:,1024:] = node_feat[:,2242:] #PLM+DSSP (along with previous line)
-        #node_feat_1dmf_remove[:,:1024+1218] = node_feat[:,:1024+1218] #PLM+1DMF
+        node_feat_reduced[:,:1024] = node_feat[:,:1024] #PLM, should save as node_feat_reduced
+        node_feat_reduced[:,1024:] = node_feat[:,2242:] #PLM+DSSP (along with previous line), should save as node_feat_reduced_dssp
         #PLM+1DMF+DSSP: use node_feat_normalized
-        
-        #print(str(np.shape(node_feat_1dmf_remove)))
-        np.save("codebase/data/npy/" + str(pdb) + "-node_feat_reduced_dssp.npy", node_feat_1dmf_remove)
-        
-        
 
-reduce_dim()
+        np.save("codebase/data/npy/" + str(pdb) + "-node_feat_reduced_dssp.npy", node_feat_reduced)
+        

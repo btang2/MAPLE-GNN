@@ -64,13 +64,19 @@ def CTD_Distribution(fastas, groupings = ['AGV','ILFP','YMTS','HNQW','RK','DE','
         #for each possible group, find where 1st, 25%, 50%, 75%, and last index of that group occurs
         #and divide by sequence length (letterIdx) (same as normType='100')
         for group in groups:
+            #print(str(group) + " " + str(letterIdx) + " " + str(len(idxCount[group])))
+            
             vals = idxCount[group]
             if len(vals) == 0:
                 vals = [0] #just make all values 0 if it didn't appear
             totalCount = len(idxCount[group])
             valIdxs = [0,round((len(vals)-1)*.25),round((len(vals)-1)*.5),round((len(vals)-1)*.75),-1]
             for item in valIdxs:
-                fastaVals.append(vals[item]/(letterIdx-1))
+                #print(str(vals[item]/(letterIdx-1)))
+                if (letterIdx == 1):
+                    fastaVals.append(vals[item])
+                    continue
+                fastaVals.append(vals[item]/(letterIdx-1)) #???
         retVals.append(fastaVals)
         
     return retVals
