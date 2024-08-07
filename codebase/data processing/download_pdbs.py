@@ -12,6 +12,8 @@ import modules
 import math
 import torch
 
+#not needed for the uploade
+
 def fetch_pdb_file(pdb_id):
     the_url = "https://files.rcsb.org/download/" + pdb_id
     #the_url = "https://files.wwpdb.org/download/" + pdb_id

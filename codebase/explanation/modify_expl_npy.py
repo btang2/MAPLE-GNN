@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 path_root = Path(__file__).parents[1]  # upto 'codebase' folder
 sys.path.insert(0, str(path_root))
-explanation_pairs = [] #insert explanation pairs here
+explanation_pairs = [("8QU3", "B"), ("8QU3", "C"), ("1RU0", "A"), ("1RU0", "B")] #insert/copy explanation pairs here
 #[("1TUP", "A"), ("1TUP", "B"), ("6EC0", "A"), ("6EC0", "B"), ("1GRI", "A"), ("1GRI", "B"), ("1BUW", "C"), ("1BUW", "D"), ("3OS8", "A"), ("3OS8", "C"), ("1RFB", "A"), ("1RFB", "B"), ("1AGN", "C"), ("1AGN", "D"), ("5I6Z", "B"), ("5I6Z", "C"), ("7AOS", "A"), ("7AOS", "B"), ("1BJ1", "H"), ("1BJ1", "L"), ("8J7F", "C"), ("8J7F", "D"), ("3I40", "A"), ("3I40", "B"), ("6DDF", "A"), ("6DDF", "R"), ("1IZN", "C"), ("1IZN", "D"), ("1FIN", "A"), ("1FIN", "B"), ("1RUZ", "L"), ("1RUZ", "M"), ("7K43", "B"), ("7K43", "C"), ("2AAI", "A"), ("2AAI", "B"), ("3IFL", "H"), ("3IFL", "L"), ("1BR1", "A"), ("1BR1", "B"), ("3RU8", "H"), ("3RU8", "X")]
 
 def normalize(x):
@@ -72,3 +72,5 @@ def reduce_dim():
         
         #print(str(np.shape(node_feat_1dmf_remove)))
         np.save("codebase/data/explain-npy/" + str(pdb) + "-node_feat_reduced_dssp.npy", node_feat_1dmf_remove)
+
+reduce_dim()

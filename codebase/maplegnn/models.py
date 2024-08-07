@@ -757,7 +757,7 @@ class GT_sagpool(nn.Module):
         else:
             return out, p1_perm, p1_attr, p2_perm, p2_attr #in [0,1]
 
-#Model for 5-Fold CV
+#Model for 5-Fold CV/Strict Testing
 class MH_GATv2_sagpool_GraphConv(nn.Module):
     def __init__(self, n_output=1, num_node_features = 1024+14, hidden_dim = 128, dropout=0.2, pool_dropout= 0.2): 
         #num_node_features: 1038 for PLM+DSSP, 2256 for PLM+1DMF+DSSP, reduced output dim for space constraint, now 256 for extra features, 3 head attention
@@ -907,6 +907,80 @@ class MAPLEGNN(nn.Module):
         else:
             return out, p1_perm, p1_attr, p2_perm, p2_attr #in [0,1]
 
+class MAPLEGNN_exp(nn.Module):
+    def __init__(self, n_output=1, num_node_features = 1024+14, hidden_dim = 128, dropout=0.2, pool_dropout = 0.2): 
+        #num_node_features: 1038 for PLM+DSSP, 2256 for PLM+1DMF+DSSP, reduced output dim for space constraint, now 256 for extra features, 3 head attention
+        #do somoething here
+        print('Loaded MAPLE-GNN')
+        super(MAPLEGNN_exp, self).__init__()
+
+        self.hidden_dim = hidden_dim #hyperparameter, though 8 seems to perform best
+        self.pool_dropout = pool_dropout
+        #self.min_score = min_score
+        # protein 1 & protein 2
+        self.n_output = n_output
+
+        self.conv1 = GATv2Conv(in_channels=num_node_features, out_channels=hidden_dim, dropout=pool_dropout, edge_dim=2, concat=False, heads=3) #no multi-head concat
+        self.bn1 = torch.nn.BatchNorm1d(hidden_dim)
+        self.sagpool1 = SAGPooling(in_channels=hidden_dim, ratio=self.pool_dropout) #30%
+
+        #self.conv2 = GATv2Conv(in_channels=hidden_dim, out_channels=hidden_dim, dropout=0.0, edge_dim=2)
+
+        #self.conv2 = GATv2Conv(in_channels=hidden_dim, out_channels=hidden_dim, edge_dim=2)
+        #self.bn2 = torch.nn.BatchNorm1d(hidden_dim)
+        #self.sagpool2 = SAGPooling(in_channels=hidden_dim, ratio=self.po) #0.125 of nodes
+
+        self.lin1 = torch.nn.Linear(self.hidden_dim*2, self.hidden_dim)
+        self.lin2 = torch.nn.Linear(self.hidden_dim, self.hidden_dim//2)
+        self.out = torch.nn.Linear(self.hidden_dim//2, self.n_output)
+
+        self.relu = nn.LeakyReLU(negative_slope=0.01) #hyperparameter: set to 0.1 and test
+        self.dropout = nn.Dropout(dropout)
+        self.sigmoid = nn.Sigmoid()
+    def forward(self, p1_data, p2_data, train=True):
+        p1_x, p1_edge_index, p1_edge_feat, p1_batch = p1_data.x, p1_data.edge_index, p1_data.edge_attr, p1_data.batch
+        p2_x, p2_edge_index, p2_edge_feat, p2_batch = p2_data.x, p2_data.edge_index, p2_data.edge_attr, p2_data.batch
+        
+        p1_x = self.conv1(x = p1_x, edge_index = p1_edge_index, edge_attr = p1_edge_feat)
+        p1_x = self.relu(p1_x)
+        p1_x = self.bn1(p1_x)
+        p1_x = self.dropout(p1_x)
+        p1_x, p1_edge_index, p1_edge_feat, p1_batch, p1_perm, p1_attr = self.sagpool1(x=p1_x, edge_index = p1_edge_index, edge_attr = p1_edge_feat, batch=p1_batch) #x, edge_idx, edge_feat, batch, perm, scores
+        #p1_x = self.dropout(p1_x)
+        p1_x1 = gep(p1_x, p1_batch)
+        #print(self.sagpool1(p1_x, p1_edge_index, p1_edge_feat, p1_batch))
+        
+        #p1_x1 = torch.cat([gmp(p1_x, p1_batch), gep(p1_x, p1_batch)], dim=1) 
+        #p1_x2 = torch.cat([gmp(p1_x, p1_batch), gep(p1_x, p1_batch)], dim=1)
+
+        p2_x = self.conv1(x = p2_x, edge_index = p2_edge_index, edge_attr = p2_edge_feat)
+        p2_x = self.relu(p2_x)
+        p2_x = self.bn1(p2_x)
+        p2_x = self.dropout(p2_x)
+        p2_x, p2_edge_index, p2_edge_feat, p2_batch, p2_perm, p2_attr = self.sagpool1(x=p2_x, edge_index = p2_edge_index, edge_attr = p2_edge_feat, batch=p2_batch)
+        #p2_x = self.dropout(p2_x)
+        #p2_x1 = torch.cat([gmp(p2_x, p2_batch), gep(p2_x, p2_batch)], dim=1)
+        p2_x1 = gep(p2_x, p2_batch)
+
+        #p2_x = self.conv2(x = p2_x, edge_index = p2_edge_index, edge_attr = p2_edge_feat)
+        #p2_x = self.relu(p2_x)
+        #p2_x2 = torch.cat([gmp(p2_x, p2_batch), gep(p2_x, p2_batch)], dim=1)
+
+        #p2_x = p2_x1 + p2_x2
+
+        xc = torch.cat((p1_x1, p2_x1), 1)
+        #print("done conv")
+        #print("done mutual attn")
+        # add some dense layers
+        xc = self.relu(self.lin1(xc))
+        xc = self.dropout(xc)
+        xc = self.relu(self.lin2(xc))
+        xc = self.dropout(xc)
+        out = self.sigmoid(self.out(xc))
+        if (train):
+            return out
+        else:
+            return out, p1_perm, p1_attr, p2_perm, p2_attr #in [0,1]
 #Unused Models
 class MH_GATv2_sagpool_GraphConv_exp(nn.Module):
     def __init__(self, n_output=1, num_node_features = 1024+14, hidden_dim = 128, dropout=0.2, pool_dropout= 0.2): 

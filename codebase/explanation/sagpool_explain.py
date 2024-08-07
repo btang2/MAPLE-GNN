@@ -338,7 +338,7 @@ def calculate_metrics(p1_ID, p2_ID, p1_node_importance, p2_node_importance, p1_g
     print("#####")
 
 
-def visualize_1d_IG(model, modelname, p1_ID, p2_ID, p1_node_norm, p2_node_norm, p1_gt, p2_gt, cutoff):
+def visualize_1d_IG(model, modelname, proteinname, p1_ID, p2_ID, p1_node_norm, p2_node_norm, p1_gt, p2_gt, cutoff):
     #p1_node_norm, p2_node_norm, p1_gt_transform, p2_gt_transform = calculate_IG_gt_vectors(model, modelname, p1_ID, p2_ID, p1_gt, p2_gt, cutoff)
 
     #graphing
@@ -395,13 +395,13 @@ def visualize_1d_IG(model, modelname, p1_ID, p2_ID, p1_node_norm, p2_node_norm, 
     ax2.tick_params(axis='y', labelsize=4, width=0.5, length=2.0) #9
     [x.set_linewidth(0.5) for x in ax2.spines.values()]
 
-    plt.suptitle("Human Insulin Protein Binding Interface (3I40-A/B) Prediction Attribution Scores", fontsize = 7, weight='bold') #12, change with ideal protein
+    plt.suptitle(f"{protein_name} Protein Binding Interface ({p1_ID[:4].upper()}-{p1_ID[4]}/{p2_ID[5]}) Prediction Attribution Scores", fontsize = 7, weight='bold') #12, change with ideal protein
     plt.tight_layout()
     plt.subplots_adjust(top=0.72)
-    plt.savefig(f"codebase/images/{p1_ID[:4]}-attribution.pdf", bbox_inches = 'tight', dpi=600)
+    plt.savefig(f"codebase/images/0strict-{p1_ID[:4]}-attribution.png", bbox_inches = 'tight', dpi=600)
     plt.close()
 
-def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform, cutoff):
+def visualize_2d_graph_IG(ID, chain_1, chain_2, protein_name, c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform, cutoff):
     #Here, c1_attr/c2_attr represents attribution scores (MAPLE-GNN normalized integrated gradients attributions or ground truth)
     #run calculate_IG_gt_vectors beforehand to use as input
     c1_max_attr = np.max(c1_norm_attr) 
@@ -442,7 +442,7 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
                 s = 0.0
                 l = 0.8 #contrast non-active nodes from chains
             else:
-                s = 0.4 + 0.6*(c1_norm_attr[node] / c1_max_attr * s)
+                s = 0.5 + 0.5*(c1_norm_attr[node] / c1_max_attr * s)
             if (c1_gt_transform[node] <= 0.0):
                 s_gt = 0.0
                 l_gt = 0.8
@@ -453,7 +453,7 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
                 s = 0.0
                 l = 0.6
             else:
-                s = 0.4 + 0.6*(c2_norm_attr[node-len(c1_norm_attr)] / c2_max_attr * s)
+                s = 0.5 + 0.5*(c2_norm_attr[node-len(c1_norm_attr)] / c2_max_attr * s)
             if (c2_gt_transform[node-len(c1_norm_attr)] <= 0.0):
                 s_gt = 0.0
                 l_gt = 0.6
@@ -470,8 +470,8 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
         patch_arr.append(mpatches.Patch(color=colors[i], label='Chain ' + str(seq_key_list[i]) + " Interface"))
         orig_patch_arr.append(mpatches.Patch(color=colors[i], label='Chain ' + str(seq_key_list[i])))
 
-    ax1.legend(handles=patch_arr,loc=1, prop={'size':3, 'weight': 'bold'}) #6
-    ax2.legend(handles=patch_arr,loc=1, prop={'size':3, 'weight': 'bold'}) #6
+    ax1.legend(handles=patch_arr,loc=4, prop={'size':3, 'weight': 'bold'}) #6
+    ax2.legend(handles=patch_arr,loc=4, prop={'size':3, 'weight': 'bold'}) #6
     #ax3.legend(handles=orig_patch_arr,loc=1, prop={'size':6})
 
     #relabel to 1-index & by chain
@@ -484,23 +484,29 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
     node_size = 100
     font_size = 3
     
-    if (n_nodes <= 250):
+    if (n_nodes <= 100):
         #small
-        print("nodes < 250")
-        width = 0.02
-        node_size = 40
+        print("nodes < 100")
+        width = 0.15
+        node_size = 30
         font_size = 2.5
         #node_size = 800
         #font_size = 14
-    elif (n_nodes > 250 and n_nodes <= 750):
-        width = 0.01 #update 
-        node_size = 20
+    elif n_nodes > 100 and n_nodes <= 250:
+        print("nodes < 250")
+        width = 0.1
+        node_size = 8
         font_size = 1.5
+    elif (n_nodes > 250 and n_nodes <= 750):
+        print("nodes < 750")
+        width = 0.1 #update 
+        node_size = 3
+        font_size = 0.2
     else:
         #n_nodes > 750
-        width = 0.0025
-        node_size = 10
-        font_size = 0.9
+        width = 0.05
+        node_size = 2
+        font_size = 0.1
     
     nx.draw_networkx_edges(G=G, pos=pos,width=width, ax=ax1)
     nx.draw_networkx_nodes(G=G, pos=pos, node_color = color_map_ig, node_size=node_size, ax=ax1) #color_map
@@ -519,26 +525,54 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, c1_norm_attr, c2_norm_attr, c1_g
     #nx.draw_networkx_labels(G=G, pos=pos, font_size = font_size, ax=ax3)
     #ax3.set_title(f"Baseline Protein Graph Representation", fontsize = 10)
     
-    strFile = "codebase/images/" + str(ID) + "-combined.pdf"
+    strFile = "codebase/images/0strict-" + str(ID) + "-combined.png"
 
      #remove margin box
-    plt.suptitle("Human Insulin (3I40-A/B) Graph-Level Binding Interface Attribution Comparison", fontsize=7, weight = 'bold') #12
+    plt.suptitle(f"{protein_name} ({ID.upper()}-{chain_1.upper()}/{chain_2.upper()}) Graph-Level Binding Interface Attribution Comparison", fontsize=7, weight = 'bold') #12
     #              Human Insulin Protein Binding Interface (3I40-A/B) Prediction Attribution Scores With Integrated Gradients
     plt.tight_layout()
     plt.subplots_adjust(top=0.72)
     plt.savefig(strFile, bbox_inches = 'tight', dpi=600)
+    
     plt.close()
     
 
 
 model = MAPLEGNN
-modelname = "CROSSVALMODEL-4" 
+
+#promising explainability: 1, 3, 6, 7
+#insulin: 7
+#gcn4: 9
+#nrdh redoxin: 0
+#pe/ppe: 7
+#dap12 domain: 9
+#ssbp2: 4
+#platelet factor 4: 2 
+#tbl1 domain: 1
+#pc4 transc coactivator: 7 
+#miner1: 0 
+#mhf1-mhf2 complex: 3
+#cystatin: 2
+#dcoh2: 9 
+
+#alc dehydrogenase: 
+modelname = "MAPLEGNN-VAL-9" 
 cutoff = "9"
-p1_ID = "3I40-A"
-p2_ID = "3I40-B"
-p1_gt = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21]
-p2_gt = [2, 3, 4, 5, 6, 7, 8, 11, 14, 15, 18, 19, 22, 23, 24, 25, 26, 27, 28, 30]
+
+#protein_name = "Human Insulin" 
+#p1_ID = "3I40-A"
+#p2_ID = "3I40-B"
+#p1_gt = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21]
+#p2_gt = [2, 3, 4, 5, 6, 7, 8, 11, 14, 15, 18, 19, 22, 23, 24, 25, 26, 27, 28, 30]
+
+protein_name = "EGF"
+p1_ID = "1BJ1-H"
+p2_ID = "1BJ1-L"
+p1_gt = [37, 39, 43, 44, 45, 46, 47, 50, 59, 61, 62, 63, 95, 99, 105, 106, 107, 108, 109, 110, 111, 113, 114, 115, 130, 131, 132, 133, 134, 135, 136, 137, 139, 140, 141, 142, 145, 147, 166, 168, 169, 170, 171, 173, 174, 175, 176, 181, 183, 185, 187, 213, 218]
+p2_gt = [1, 32, 34, 36, 38, 41, 42, 43, 44, 45, 46, 49, 50, 55, 87, 89, 91, 94, 95, 96, 98, 99, 100, 116, 117, 118, 119, 120, 121, 122, 123, 124, 127, 129, 131, 133, 135, 137, 138, 160, 161, 162, 163, 164, 165, 167, 174, 175, 176, 178, 180]
+
 
 c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform = calculate_IG_gt_vectors(model, modelname, p1_ID, p2_ID, p1_gt, p2_gt, cutoff)
-visualize_1d_IG(model, modelname, p1_ID, p2_ID, c1_norm_attr, c2_norm_attr, p1_gt, p2_gt, cutoff)
-visualize_2d_graph_IG(p1_ID[:4], p1_ID[5], p2_ID[5], c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform, 9)
+#visualize_1d_IG(model, modelname, protein_name, p1_ID, p2_ID, c1_norm_attr, c2_norm_attr, p1_gt, p2_gt, cutoff)
+visualize_2d_graph_IG(p1_ID[:4], p1_ID[5], p2_ID[5], protein_name, c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform, 9)
+

@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from metrics import get_cross_entropy, get_accuracy, precision, sensitivity, specificity, f_score, mcc, auroc, auprc
-from dataprep import generate_split, generate_strict_split
+from metrics import get_tp, get_fp, get_tn, get_fn
+from dataprep import generate_split
 from models import GAT_plm, GAT_plm_dssp, GAT_plm_edgefeat, GAT_plm_dssp_edgefeat, GAT_plm_dssp_edgefeat_sagpool
 from models import GAT_sagpool_baseline, GCN_sagpool, GATv2_sagpool, MH_GATv2_sagpool, GT_sagpool, MH_GT_sagpool
 from models import MH_GATv2_sagpool_GraphConv, MH_GATv2_sagpool_GCNConv, MH_GATv2_sagpool_GATConv, MH_GATv2_sagpool_GATv2Conv, MH_GATv2_sagpool_SAGEConv
@@ -29,6 +30,10 @@ def test_model(model, modelname, testloader):
   labels = labels.numpy().flatten()
   predictions = predictions.numpy().flatten()
 
+  tn = get_tn(labels, predictions, 0.5)
+  tp = get_tp(labels, predictions, 0.5)
+  fn = get_fn(labels, predictions, 0.5)
+  fp = get_fp(labels, predictions, 0.5)
 
   loss_ = get_cross_entropy(labels, predictions)
   acc_ = get_accuracy(labels, predictions, 0.5)
@@ -50,6 +55,7 @@ def test_model(model, modelname, testloader):
   print(f'MCC : {mcc_}')
   print(f'AUROC: {auroc_}')
   print(f'AUPRC: {auprc_}')
+  print(f'TP: {tp}, FP: {fp}, TN: {tn}, FN: {fn}') #this should be ok
 
 #trainloader, testloader = generate_split("9", 8)
 #model = MH_GATv2_sagpool_GraphConv

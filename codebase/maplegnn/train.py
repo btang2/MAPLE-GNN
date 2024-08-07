@@ -9,6 +9,10 @@ import torch_optimizer as optim
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, MultiStepLR
 from metrics import *
 import time
+import sys
+from pathlib import Path
+path_root = Path(__file__).parents[1]  # upto 'codebase' folder
+sys.path.insert(0, str(path_root))
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.cuda("cpu")
 
@@ -16,11 +20,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
-from dataprep import generate_split, generate_strict_split
-from models import GAT_plm, GAT_plm_edgefeat, GAT_plm_dssp, GAT_plm_dssp_edgefeat, GAT_plm_dssp_edgefeat_sagpool, GAT_plm_1dmf_dssp_edgefeat_sagpool
-from models import GAT_sagpool_baseline, GCN_sagpool, GATv2_sagpool, MH_GATv2_sagpool, GT_sagpool, MH_GT_sagpool
-from models import MH_GATv2_concat_sagpool_GraphConv, MH_GATv2_sagpool_GraphConv, MH_GATv2_sagpool_GCNConv, MH_GATv2_sagpool_GATConv, MH_GATv2_sagpool_GATv2Conv, MH_GATv2_sagpool_SAGEConv, MH_GATv2_sagpool_sepGraphConv
-from models import MAPLEGNN
+from maplegnn.dataprep import generate_split
+from maplegnn.models import GAT_plm, GAT_plm_edgefeat, GAT_plm_dssp, GAT_plm_dssp_edgefeat, GAT_plm_dssp_edgefeat_sagpool
+from maplegnn.models import GAT_sagpool_baseline, GCN_sagpool, GATv2_sagpool, MH_GATv2_sagpool, GT_sagpool, MH_GT_sagpool
+from maplegnn.models import MH_GATv2_sagpool_GraphConv, MH_GATv2_sagpool_GCNConv, MH_GATv2_sagpool_GATConv, MH_GATv2_sagpool_GATv2Conv, MH_GATv2_sagpool_SAGEConv
+from maplegnn.models import MAPLEGNN
 from torch_geometric.loader import DataLoader
 import random
 
@@ -47,6 +51,7 @@ def train_model(epochs, model, modelname, trainloader, testloader):
     loss_func = nn.BCELoss() #cross entropy instead of MSE
     predictions_tr = torch.Tensor().to(device)
     scheduler = MultiStepLR(optimizer=optimizer, milestones = [10, 20, 24, 28, 32, 36, 40], gamma=0.5) #38
+    #scheduler = StepLR(optimizer=optimizer, step_size=10, gamma = 0.5)
     labels_tr = torch.Tensor().to(device)
     #aug_predictions_tr = torch.Tensor().to(device)
     #index = 0
@@ -54,7 +59,7 @@ def train_model(epochs, model, modelname, trainloader, testloader):
       #if (index >= len(random_indices)):
       #  break
       #if (random_indices[index] == count):
-      if (count % 500 == 0):
+      if (count % 250 == 0):
         print(f'epoch {epoch}, examples done: {count}')
       
       prot_1 = prot_1.to(device)
@@ -75,10 +80,10 @@ def train_model(epochs, model, modelname, trainloader, testloader):
     L = labels_tr.flatten()
     P = predictions_tr.flatten()
     #print( f'Train Predictions---------------------------------------------{P}')
-    print(f'Train Prediction max: {np.max(P)}')
-    print(f'Train Prediction min: {np.min(P)}')
-    print(f'Train Prediction avg: {np.mean(P)}')
-    print(f'Train Prediction std: {np.std(P)}')
+    #print(f'Train Prediction max: {np.max(P)}')
+    #print(f'Train Prediction min: {np.min(P)}')
+    #print(f'Train Prediction avg: {np.mean(P)}')
+    #print(f'Train Prediction std: {np.std(P)}')
     #print(f'Train Labels----------------------------------------------------{L}')
     #print(labels_tr)
     #print(predictions_tr)
@@ -121,10 +126,10 @@ def train_model(epochs, model, modelname, trainloader, testloader):
     
     G, P = predict(model, device, testloader)
     #print( f'Predictions---------------------------------------------{P}')
-    print(f'Val Prediction max: {np.max(P)}')
-    print(f'Val Prediction min: {np.min(P)}')
-    print(f'Val Prediction avg: {np.mean(P)}')
-    print(f'Val Prediction std: {np.std(P)}')
+    #print(f'Val Prediction max: {np.max(P)}')
+    #print(f'Val Prediction min: {np.min(P)}')
+    #print(f'Val Prediction avg: {np.mean(P)}')
+    #print(f'Val Prediction std: {np.std(P)}')
     #print(f'Labels----------------------------------------------------{G}')
     loss = get_cross_entropy(G,P)
     accuracy = get_accuracy(G,P, 0.5)

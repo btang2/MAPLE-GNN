@@ -1,7 +1,8 @@
 import os
 from Bio.PDB import PDBParser
 from Bio.PDB.DSSP import DSSP
-import requests as re
+import requests as r
+import re
 import numpy as np
 import numpy.linalg as la
 import networkx as nx
@@ -625,7 +626,7 @@ def ID_to_save_graph(ID, chainid, ang_cutoff=9.0):
 def fetch_pdb_file(pdb_id):
     the_url = "https://files.rcsb.org/download/" + pdb_id
     #the_url = "https://files.wwpdb.org/download/" + pdb_id
-    page = re.get(the_url)
+    page = r.get(the_url)
     pdb_file = page.content.decode('utf-8')
     pdb_file = pdb_file.replace('\\n', '\n')
     return(pdb_file)
@@ -682,7 +683,7 @@ def visualize_graph(ID, ang_cutoff, adj_matrix, seq_lenptr, seq_key_list):
     plt.subplots_adjust(top=0.95) #better visuals
     plt.savefig(strFile, bbox_inches = "tight")
 
-"""
+
 if __name__ == '__main__':
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -695,7 +696,7 @@ if __name__ == '__main__':
     
     #explanation_pairs = [("1TUP", "A"), ("1TUP", "B"), ("6EC0", "A"), ("6EC0", "B"), ("1GRI", "A"), ("1GRI", "B"), ("1BUW", "C"), ("1BUW", "D"), ("3OS8", "A"), ("3OS8", "C"), ("1RFB", "A"), ("1RFB", "B"), ("1AGN", "C"), ("1AGN", "D"), ("5I6Z", "B"), ("5I6Z", "C"), ("7AOS", "A"), ("7AOS", "B"), ("1BJ1", "H"), ("1BJ1", "L"), ("8J7F", "C"), ("8J7F", "D"), ("3I40", "A"), ("3I40", "B"), ("6DDF", "A"), ("6DDF", "R"), ("1IZN", "C"), ("1IZN", "D"), ("1FIN", "A"), ("1FIN", "B"), ("1RUZ", "L"), ("1RUZ", "M"), ("7K43", "B"), ("7K43", "C"), ("2AAI", "A"), ("2AAI", "B"), ("3IFL", "H"), ("3IFL", "L"), ("1BR1", "A"), ("1BR1", "B"), ("3RU8", "H"), ("3RU8", "X")]
 
-    #explanation_pairs = [("4HHB", "C"), ("4HHB", "D")]
+    explanation_pairs = [("8QU3", "B"), ("8QU3", "C"), ("1RU0", "A"), ("1RU0", "B")]
     for (ID, chainid) in explanation_pairs:
         ID = ID.lower()
         if (not os.path.exists("codebase/data/explain-pdb/" + str(ID) + ".pdb")):
@@ -711,7 +712,7 @@ if __name__ == '__main__':
     #PDB_to_DSSP(ID, "A", seq_dict)
     #ang_cutoff = 9.0
     #ID_to_save_graph(ID, chainid='A')
-"""
+
 
 
 
