@@ -13,6 +13,6 @@ Associated with each protein PDB ID is a preprocessed hybrid-feature graph repre
 ### Model Training and Testing
 All code necessary for training, testing, and k-fold cross-validation is available at `codebase/maplegnn`. 
 ### PPI Prediction
-New PPI predictions, along with integrated gradients-extracted attribution scores, can be conducted under `codebase/explanation/sagpool-explain.py`. \
+`codebase/explanation/sagpool-explain.py` can be used for new PPI predictions and integrated gradients-extracted attribution scores. \
 Code for preprocessing new PDB files can be found under the `ID_to_explain_graph` method at `codebase/data processing/modules.py`. \
 Downloaded PDB files must be input into the `codebase/data/explain-pdb` file, and hybrid-feature graph representations will be stored in the `codebase/data/explain-npy` folder.
