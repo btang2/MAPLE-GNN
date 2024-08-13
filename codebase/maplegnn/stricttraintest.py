@@ -59,8 +59,8 @@ def collate_fn(batch):
     return list(graph1_batch), list(graph2_batch), torch.tensor(label_batch, dtype=torch.float32)
 
 def load_data(cutoff, batch_size, file_suffix=""):
-    train_file = 'train_interactions_data' + file_suffix + '.txt'
-    test_file = 'test_interactions_data' + file_suffix + '.txt'
+    train_file = 'strict_splits/train_interactions_data' + file_suffix + '.txt'
+    test_file = 'strict_splits/test_interactions_data' + file_suffix + '.txt'
     train_pairs_labels = []
     test_pairs_labels = []
     with open(train_file, 'r') as f1:
