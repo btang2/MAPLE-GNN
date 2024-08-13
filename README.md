@@ -11,7 +11,8 @@ Associated with each protein PDB ID is a preprocessed hybrid-feature graph repre
 2. `ID-edge_list_9.npy` (edge list generated using an angstrom cutoff of 9.0) 
 3. `ID-edge_feat_9.npy` (edge features generated using an angstrom cutoff of 9.0)
 ### Model Training and Testing
-All code necessary for training, testing, and k-fold cross-validation is available at `codebase/maplegnn`. 
+All code necessary for training and testing is available at `codebase/maplegnn`. \
+Preprocessed graph representations downloaded from Zenodo should be placed in the `codebase/data/npy` director.
 ### PPI Prediction
 `codebase/explanation/sagpool-explain.py` can be used for new PPI predictions and integrated gradients-extracted attribution scores. \
 Code for preprocessing new PDB files can be found under the `ID_to_explain_graph` method at `codebase/data processing/modules.py`. \
