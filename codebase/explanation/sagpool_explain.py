@@ -440,23 +440,23 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, protein_name, c1_norm_attr, c2_n
         if (cur_comp == 0):
             if (c1_norm_attr[node] <= 0.0):
                 s = 0.0
-                l = 0.8 #contrast non-active nodes from chains
+                l = 0.5 #contrast non-active nodes from chains
             else:
                 s = 0.5 + 0.5*(c1_norm_attr[node] / c1_max_attr * s)
             if (c1_gt_transform[node] <= 0.0):
                 s_gt = 0.0
-                l_gt = 0.8
+                l_gt = 0.5
             else: 
                 s_gt = 1.0
         elif (cur_comp == 1):
             if (c2_norm_attr[node-len(c1_norm_attr)] <= 0.0):
                 s = 0.0
-                l = 0.6
+                l = 0.75
             else:
                 s = 0.5 + 0.5*(c2_norm_attr[node-len(c1_norm_attr)] / c2_max_attr * s)
             if (c2_gt_transform[node-len(c1_norm_attr)] <= 0.0):
                 s_gt = 0.0
-                l_gt = 0.6
+                l_gt = 0.75
             else: 
                 s_gt = 1.0
         scaled_color_ig = mpl.colors.rgb2hex(colorsys.hls_to_rgb(h,l,s))
@@ -525,7 +525,7 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, protein_name, c1_norm_attr, c2_n
     #nx.draw_networkx_labels(G=G, pos=pos, font_size = font_size, ax=ax3)
     #ax3.set_title(f"Baseline Protein Graph Representation", fontsize = 10)
     
-    strFile = "codebase/images/0strict-" + str(ID) + "-combined.png"
+    strFile = "codebase/images/00strict-" + str(ID) + "-combined.png"
 
      #remove margin box
     plt.suptitle(f"{protein_name} ({ID.upper()}-{chain_1.upper()}/{chain_2.upper()}) Graph-Level Binding Interface Attribution Comparison", fontsize=7, weight = 'bold') #12
@@ -539,37 +539,20 @@ def visualize_2d_graph_IG(ID, chain_1, chain_2, protein_name, c1_norm_attr, c2_n
 
 
 model = MAPLEGNN
-
-#promising explainability: 1, 3, 6, 7
-#insulin: 7
-#gcn4: 9
-#nrdh redoxin: 0
-#pe/ppe: 7
-#dap12 domain: 9
-#ssbp2: 4
-#platelet factor 4: 2 
-#tbl1 domain: 1
-#pc4 transc coactivator: 7 
-#miner1: 0 
-#mhf1-mhf2 complex: 3
-#cystatin: 2
-#dcoh2: 9 
-
-#alc dehydrogenase: 
-modelname = "MAPLEGNN-VAL-9" 
+modelname = "MAPLEGNN-VAL-7" 
 cutoff = "9"
 
-#protein_name = "Human Insulin" 
-#p1_ID = "3I40-A"
-#p2_ID = "3I40-B"
-#p1_gt = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21]
-#p2_gt = [2, 3, 4, 5, 6, 7, 8, 11, 14, 15, 18, 19, 22, 23, 24, 25, 26, 27, 28, 30]
+protein_name = "Human Insulin" 
+p1_ID = "3I40-A"
+p2_ID = "3I40-B"
+p1_gt = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21]
+p2_gt = [2, 3, 4, 5, 6, 7, 8, 11, 14, 15, 18, 19, 22, 23, 24, 25, 26, 27, 28, 30]
 
-protein_name = "EGF"
-p1_ID = "1BJ1-H"
-p2_ID = "1BJ1-L"
-p1_gt = [37, 39, 43, 44, 45, 46, 47, 50, 59, 61, 62, 63, 95, 99, 105, 106, 107, 108, 109, 110, 111, 113, 114, 115, 130, 131, 132, 133, 134, 135, 136, 137, 139, 140, 141, 142, 145, 147, 166, 168, 169, 170, 171, 173, 174, 175, 176, 181, 183, 185, 187, 213, 218]
-p2_gt = [1, 32, 34, 36, 38, 41, 42, 43, 44, 45, 46, 49, 50, 55, 87, 89, 91, 94, 95, 96, 98, 99, 100, 116, 117, 118, 119, 120, 121, 122, 123, 124, 127, 129, 131, 133, 135, 137, 138, 160, 161, 162, 163, 164, 165, 167, 174, 175, 176, 178, 180]
+#protein_name = "Yeast GCN4"
+#p1_ID = "1YSA-C"
+#p2_ID = "1YSA-D"
+#p1_gt = [22, 25, 26, 29, 30, 32, 33, 36, 37, 39, 40, 43, 44, 46, 47, 49, 50, 51, 53, 54, 57]
+#p2_gt = [23, 26, 27, 30, 31, 33, 34, 37, 38, 40, 41, 44, 45, 47, 48, 50, 51, 52, 54, 55, 56, 57]
 
 
 c1_norm_attr, c2_norm_attr, c1_gt_transform, c2_gt_transform = calculate_IG_gt_vectors(model, modelname, p1_ID, p2_ID, p1_gt, p2_gt, cutoff)
