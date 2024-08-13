@@ -11,7 +11,7 @@ MAPLE-GNN was tested on 10 strict train-test splits without information leak gen
 ### Model Training and Testing
 All code necessary for training and testing is available at `codebase/maplegnn`. \
 Preprocessed graph representations downloaded from Zenodo should be placed in the `codebase/data/npy` directory. \
-Each strict train-test split can be accessed at `train_interactions_data{i}.txt` and `test_interactions_data{i}.txt`, respectively.
+Each strict train-test split can be accessed in the `strict_splits` folder under `train_interactions_data{i}.txt` and `test_interactions_data{i}.txt`, respectively.
 ### PPI Prediction
 `codebase/explanation/sagpool-explain.py` can be used for new PPI predictions and integrated gradients-extracted attribution scores. \
 Code for preprocessing new PDB files can be found under the `ID_to_explain_graph` method at `codebase/data processing/modules.py`. \
