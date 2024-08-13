@@ -1,5 +1,5 @@
 # MAPLE-GNN
-A **M**ulti-head **A**ttention, **P**rotein **L**anguage Model-**E**nhanced **G**raph **N**eural **N**etwork for Protein-Protein Interaction Prediction: \
+### A **M**ulti-Head **A**ttention, **P**rotein **L**anguage Model-**E**nhanced **G**raph **N**eural **N**etwork for Protein-Protein Interaction Prediction
 First-author research project for the **[Anson L. Clark Scholars Program](https://www.depts.ttu.edu/honors/academicsandenrichment/affiliatedandhighschool/clarks/)** at Texas Tech University. Publication in preparation. \
 ![MAPLE-GNN Architecture](https://github.com/btang2/MAPLE-GNN/blob/main/images/gnn-model-diagram.png?raw=true)
 ### Dataset
