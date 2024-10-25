@@ -3,7 +3,7 @@
 First-author research project for the **[Anson L. Clark Scholars Program](https://www.depts.ttu.edu/honors/academicsandenrichment/affiliatedandhighschool/clarks/)** at Texas Tech University. Publication in preparation. \
 ![MAPLE-GNN Architecture](https://github.com/btang2/MAPLE-GNN/blob/main/images/gnn-model-diagram.png?raw=true)
 ### Dataset
-Raw data was taken from the Struct2Graph dataset available at [Struct2Graph](https://github.com/baranwa2/Struct2Graph). All necessary files can be downloaded at [Zenodo](https://zenodo.org/records/13123920). \
+Raw data was taken from the Struct2Graph dataset available at [Struct2Graph](https://github.com/baranwa2/Struct2Graph). All necessary files can be downloaded at [Zenodo](https://zenodo.org/records/13256224). \
 MAPLE-GNN was tested on 10 strict train-test splits without information leak generated from the heuristic Kernighan-Lin bisection algorithm on the derived PPI graph. Associated with each protein PDB ID is a preprocessed hybrid-feature protein graph representation:
 1. `ID-node_feat_reduced_dssp.npy` (node feature matrix)
 2. `ID-edge_list_9.npy` (edge list generated using an angstrom cutoff of 9.0) 
